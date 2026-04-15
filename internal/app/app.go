@@ -11,12 +11,14 @@ import (
 	"allseer/internal/config"
 	"allseer/internal/proxy"
 	"allseer/internal/rules"
+	"allseer/internal/storage/sqlite"
 )
 
 type App struct {
 	cfg    config.Config
 	logger *slog.Logger
 	server *proxy.Server
+	store  *sqlite.Store
 }
 
 func New(cfg config.Config, logger *slog.Logger) (*App, error) {
@@ -58,19 +60,30 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 
 	engine.ReplaceRules(loadedRules)
 
+	store, err := sqlite.New(sqlite.Config{Path: cfg.Database.Path})
+	if err != nil {
+		return nil, fmt.Errorf("initialize sqlite store: %w", err)
+	}
+
+	logRepo := sqlite.NewLogRepository(store)
+
 	return &App{
 		cfg:    cfg,
 		logger: logger,
+		store:  store,
 		server: proxy.NewServer(proxy.Options{
 			ListenAddr:        cfg.Proxy.ListenAddr,
 			ReadHeaderTimeout: cfg.Proxy.ReadHeaderTimeout.Value(),
 			IdleTimeout:       cfg.Proxy.IdleTimeout.Value(),
 			RuleEngine:        engine,
+			LogRepository:     logRepo,
 		}, logger),
 	}, nil
 }
 
 func (a *App) Run(ctx context.Context) error {
+	defer a.closeResources()
+
 	errCh := make(chan error, 1)
 
 	go func() {
@@ -92,5 +105,15 @@ func (a *App) Run(ctx context.Context) error {
 		return a.server.Shutdown(shutdownCtx)
 	case err := <-errCh:
 		return err
+	}
+}
+
+func (a *App) closeResources() {
+	if a.store == nil {
+		return
+	}
+
+	if err := a.store.Close(); err != nil {
+		a.logger.Warn("failed to close sqlite store", "error", err)
 	}
 }

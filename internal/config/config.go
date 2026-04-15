@@ -39,8 +39,9 @@ func (d Duration) MarshalJSON() ([]byte, error) {
 }
 
 type Config struct {
-	Proxy ProxyConfig `json:"proxy"`
-	Rules RulesConfig `json:"rules"`
+	Proxy    ProxyConfig    `json:"proxy"`
+	Rules    RulesConfig    `json:"rules"`
+	Database DatabaseConfig `json:"database"`
 }
 
 type ProxyConfig struct {
@@ -55,6 +56,10 @@ type RulesConfig struct {
 	AdBlockFile string `json:"ad_block_file"`
 }
 
+type DatabaseConfig struct {
+	Path string `json:"path"`
+}
+
 func Default() Config {
 	return Config{
 		Proxy: ProxyConfig{
@@ -66,6 +71,9 @@ func Default() Config {
 		Rules: RulesConfig{
 			File:        "config/rules.example.yaml",
 			AdBlockFile: "config/ad_domains.txt",
+		},
+		Database: DatabaseConfig{
+			Path: "allseer.db",
 		},
 	}
 }
@@ -103,6 +111,10 @@ func (c Config) Validate() error {
 
 	if c.Proxy.ShutdownTimeout.Value() <= 0 {
 		return fmt.Errorf("proxy.shutdown_timeout must be positive")
+	}
+
+	if c.Database.Path == "" {
+		return fmt.Errorf("database.path cannot be empty")
 	}
 
 	return nil

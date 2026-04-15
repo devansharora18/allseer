@@ -14,6 +14,7 @@ Current implementation includes a working baseline proxy:
 - Rule engine evaluation for request decisions
 - Rule actions: allow, block, redirect (HTTP), and request-header mutation
 - Domain-based ad/tracker blocking from dedicated blocklist file
+- Persistent traffic logging to local SQLite database
 - Starter config and rule files
 
 ## Quick Start
@@ -35,6 +36,8 @@ By default, the proxy listens on `127.0.0.1:8080`.
 Rules are loaded from `config/rules.example.yaml` by default, and ad/tracker domains are loaded from `config/ad_domains.txt`.
 Override these through `config/config.json`.
 
+Traffic logs are persisted by default in `allseer.db` (configured via `database.path` in `config/config.json`).
+
 ## Project Layout
 
 - `cmd/allseer/main.go`: process entrypoint and lifecycle wiring
@@ -46,5 +49,5 @@ Override these through `config/config.json`.
 
 ## Next Build Step
 
-Wire persistent traffic logging and request/response interception transforms.
+Implement response interception transforms and hot-reload for runtime rules.
 

@@ -15,6 +15,7 @@ func (s *Server) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	if shouldBlockDecision(decision) {
 		s.logger.Info("connect request blocked by rule", "rule", decision.Rule.Name, "host", requestHost(r))
+		s.writeTrafficLog(r, decision, http.StatusForbidden, start, "", nil)
 		http.Error(w, "blocked by proxy rule", http.StatusForbidden)
 		return
 	}
@@ -22,11 +23,13 @@ func (s *Server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	if shouldRedirectHTTP(decision) {
 		target := strings.TrimSpace(decision.Action.Target)
 		s.logger.Warn("redirect action is unsupported for CONNECT", "rule", decision.Rule.Name, "target", target)
+		s.writeTrafficLog(r, decision, http.StatusBadRequest, start, target, errors.New("redirect unsupported for CONNECT"))
 		http.Error(w, "redirect action is unsupported for CONNECT", http.StatusBadRequest)
 		return
 	}
 
 	if r.Host == "" {
+		s.writeTrafficLog(r, decision, http.StatusBadRequest, start, "", errors.New("missing CONNECT host"))
 		http.Error(w, "missing CONNECT host", http.StatusBadRequest)
 		return
 	}
@@ -44,6 +47,7 @@ func (s *Server) handleConnect(w http.ResponseWriter, r *http.Request) {
 		}
 
 		s.logger.Error("failed to establish CONNECT target", "target", targetAddr, "error", err)
+		s.writeTrafficLog(r, decision, status, start, "https://"+targetAddr, err)
 		http.Error(w, message, status)
 		return
 	}
@@ -52,6 +56,7 @@ func (s *Server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		targetConn.Close()
 		http.Error(w, "proxy does not support connection hijacking", http.StatusInternalServerError)
+		s.writeTrafficLog(r, decision, http.StatusInternalServerError, start, "https://"+targetAddr, errors.New("http hijacker unavailable"))
 		return
 	}
 
@@ -59,6 +64,7 @@ func (s *Server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		targetConn.Close()
 		s.logger.Error("failed to hijack client connection", "target", targetAddr, "error", err)
+		s.writeTrafficLog(r, decision, http.StatusInternalServerError, start, "https://"+targetAddr, err)
 		return
 	}
 
@@ -67,17 +73,20 @@ func (s *Server) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	if _, err := rw.WriteString("HTTP/1.1 200 Connection Established\r\n\r\n"); err != nil {
 		s.logger.Warn("failed to write CONNECT response", "target", targetAddr, "error", err)
+		s.writeTrafficLog(r, decision, http.StatusBadGateway, start, "https://"+targetAddr, err)
 		return
 	}
 
 	if err := rw.Flush(); err != nil {
 		s.logger.Warn("failed to flush CONNECT response", "target", targetAddr, "error", err)
+		s.writeTrafficLog(r, decision, http.StatusBadGateway, start, "https://"+targetAddr, err)
 		return
 	}
 
 	if buffered := rw.Reader.Buffered(); buffered > 0 {
 		if _, err := io.CopyN(targetConn, rw, int64(buffered)); err != nil {
 			s.logger.Warn("failed to forward buffered CONNECT bytes", "target", targetAddr, "error", err)
+			s.writeTrafficLog(r, decision, http.StatusBadGateway, start, "https://"+targetAddr, err)
 			return
 		}
 	}
@@ -96,6 +105,21 @@ func (s *Server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	if secondErr != nil && !errors.Is(secondErr, io.EOF) {
 		s.logger.Warn("CONNECT tunnel closed with upstream error", "target", targetAddr, "error", secondErr)
 	}
+
+	status := http.StatusOK
+	var tunnelErr error
+	if firstErr != nil && !errors.Is(firstErr, io.EOF) {
+		status = http.StatusBadGateway
+		tunnelErr = firstErr
+	}
+	if secondErr != nil && !errors.Is(secondErr, io.EOF) {
+		status = http.StatusBadGateway
+		if tunnelErr == nil {
+			tunnelErr = secondErr
+		}
+	}
+
+	s.writeTrafficLog(r, decision, status, start, "https://"+targetAddr, tunnelErr)
 
 	s.logger.Info("CONNECT tunnel closed", "target", targetAddr, "duration_ms", time.Since(start).Milliseconds())
 }

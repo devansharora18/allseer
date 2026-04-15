@@ -8,5 +8,8 @@
   "rules": {
     "file": "config/rules.example.yaml",
     "ad_block_file": "config/ad_domains.txt"
+  },
+  "database": {
+    "path": "allseer.db"
   }
 }

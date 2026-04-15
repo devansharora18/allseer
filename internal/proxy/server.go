@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"allseer/internal/rules"
+	"allseer/internal/storage/sqlite"
 )
 
 type Options struct {
@@ -15,6 +16,7 @@ type Options struct {
 	ReadHeaderTimeout time.Duration
 	IdleTimeout       time.Duration
 	RuleEngine        *rules.Engine
+	LogRepository     *sqlite.LogRepository
 }
 
 type Server struct {
@@ -22,6 +24,7 @@ type Server struct {
 	transport  *http.Transport
 	dialer     *net.Dialer
 	ruleEngine *rules.Engine
+	logRepo    *sqlite.LogRepository
 	logger     *slog.Logger
 }
 
@@ -63,7 +66,7 @@ func NewServer(opts Options, logger *slog.Logger) *Server {
 		ruleEngine = rules.NewEngine(nil)
 	}
 
-	s := &Server{logger: logger, transport: transport, dialer: dialer, ruleEngine: ruleEngine}
+	s := &Server{logger: logger, transport: transport, dialer: dialer, ruleEngine: ruleEngine, logRepo: opts.LogRepository}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handleProxyRequest)

@@ -30,6 +30,7 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if shouldBlockDecision(decision) {
 		s.logger.Info("http request blocked by rule", "rule", decision.Rule.Name, "method", r.Method, "host", requestHost(r))
+		s.writeTrafficLog(r, decision, http.StatusForbidden, start, "", nil)
 		http.Error(w, "blocked by proxy rule", http.StatusForbidden)
 		return
 	}
@@ -38,11 +39,13 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		target := strings.TrimSpace(decision.Action.Target)
 		if target == "" {
 			s.logger.Warn("redirect rule missing target", "rule", decision.Rule.Name)
+			s.writeTrafficLog(r, decision, http.StatusInternalServerError, start, "", errors.New("redirect target missing"))
 			http.Error(w, "rule redirect target is missing", http.StatusInternalServerError)
 			return
 		}
 
 		s.logger.Info("http request redirected by rule", "rule", decision.Rule.Name, "method", r.Method, "from", requestHost(r), "to", target)
+		s.writeTrafficLog(r, decision, http.StatusTemporaryRedirect, start, target, nil)
 		http.Redirect(w, r, target, http.StatusTemporaryRedirect)
 		return
 	}
@@ -50,6 +53,7 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	targetURL, err := outboundURL(r)
 	if err != nil {
 		s.logger.Warn("invalid outbound URL", "error", err)
+		s.writeTrafficLog(r, decision, http.StatusBadRequest, start, "", err)
 		http.Error(w, "invalid target URL", http.StatusBadRequest)
 		return
 	}
@@ -77,6 +81,7 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		s.logger.Error("failed to reach upstream", "method", r.Method, "target", targetURL.String(), "error", err)
+		s.writeTrafficLog(r, decision, status, start, targetURL.String(), err)
 		http.Error(w, message, status)
 		return
 	}
@@ -88,7 +93,11 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if _, err := io.Copy(w, resp.Body); err != nil {
 		s.logger.Warn("failed copying upstream response body", "target", targetURL.String(), "error", err)
+		s.writeTrafficLog(r, decision, resp.StatusCode, start, targetURL.String(), err)
+		return
 	}
+
+	s.writeTrafficLog(r, decision, resp.StatusCode, start, targetURL.String(), nil)
 
 	s.logger.Info(
 		"http request forwarded",
