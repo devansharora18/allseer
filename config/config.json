@@ -6,6 +6,7 @@
     "shutdown_timeout": "10s"
   },
   "rules": {
-    "file": "config/rules.example.yaml"
+    "file": "config/rules.example.yaml",
+    "ad_block_file": "config/ad_domains.txt"
   }
 }

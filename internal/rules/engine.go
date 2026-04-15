@@ -49,7 +49,7 @@ func (e *Engine) Evaluate(ctx RequestContext) Decision {
 			continue
 		}
 
-		if !matchPattern(rule.Match.HostPattern, ctx.Host) {
+		if !matchHost(rule.Match.HostPattern, rule.Match.HostPatterns, ctx.Host) {
 			continue
 		}
 
@@ -74,6 +74,46 @@ func (e *Engine) Evaluate(ctx RequestContext) Decision {
 			Type: ActionAllow,
 		},
 	}
+}
+
+func matchHost(hostPattern string, hostPatterns []string, host string) bool {
+	if hostPattern == "" && len(hostPatterns) == 0 {
+		return true
+	}
+
+	host = strings.ToLower(strings.TrimSpace(host))
+	if host == "" {
+		return false
+	}
+
+	if hostPattern != "" && matchSingleHostPattern(strings.ToLower(hostPattern), host) {
+		return true
+	}
+
+	for _, pattern := range hostPatterns {
+		if matchSingleHostPattern(strings.ToLower(pattern), host) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func matchSingleHostPattern(pattern, host string) bool {
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		return false
+	}
+
+	if strings.ContainsAny(pattern, "*?[") {
+		ok, err := path.Match(pattern, host)
+		if err != nil {
+			return false
+		}
+		return ok
+	}
+
+	return host == pattern || strings.HasSuffix(host, "."+pattern)
 }
 
 func matchMethod(methods []string, reqMethod string) bool {

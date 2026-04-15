@@ -60,7 +60,8 @@ func hostWithoutPort(host string) string {
 		host = strings.SplitN(host, "]", 2)[0]
 	}
 
-	return host
+	host = strings.TrimSuffix(host, ".")
+	return strings.ToLower(host)
 }
 
 func shouldBlockDecision(decision rules.Decision) bool {

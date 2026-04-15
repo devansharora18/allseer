@@ -51,7 +51,8 @@ type ProxyConfig struct {
 }
 
 type RulesConfig struct {
-	File string `json:"file"`
+	File        string `json:"file"`
+	AdBlockFile string `json:"ad_block_file"`
 }
 
 func Default() Config {
@@ -63,7 +64,8 @@ func Default() Config {
 			ShutdownTimeout:   Duration(10 * time.Second),
 		},
 		Rules: RulesConfig{
-			File: "config/rules.example.yaml",
+			File:        "config/rules.example.yaml",
+			AdBlockFile: "config/ad_domains.txt",
 		},
 	}
 }

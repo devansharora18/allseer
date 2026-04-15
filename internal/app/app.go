@@ -25,18 +25,38 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	}
 
 	engine := rules.NewEngine(nil)
+	loadedRules := make([]rules.Rule, 0)
+
 	if cfg.Rules.File != "" {
-		loadedRules, err := rules.LoadFromFile(cfg.Rules.File)
+		fileRules, err := rules.LoadFromFile(cfg.Rules.File)
 		switch {
 		case err == nil:
-			engine.ReplaceRules(loadedRules)
-			logger.Info("loaded rules", "count", len(loadedRules), "file", cfg.Rules.File)
+			loadedRules = append(loadedRules, fileRules...)
+			logger.Info("loaded rules", "count", len(fileRules), "file", cfg.Rules.File)
 		case errors.Is(err, os.ErrNotExist):
 			logger.Warn("rules file not found, continuing without rules", "file", cfg.Rules.File)
 		default:
 			return nil, fmt.Errorf("load rules: %w", err)
 		}
 	}
+
+	if cfg.Rules.AdBlockFile != "" {
+		adDomains, err := rules.LoadAdBlockDomains(cfg.Rules.AdBlockFile)
+		switch {
+		case err == nil:
+			if len(adDomains) > 0 {
+				adRule := rules.BuildAdBlockRule(adDomains)
+				loadedRules = append(loadedRules, adRule)
+				logger.Info("loaded ad block domains", "count", len(adDomains), "file", cfg.Rules.AdBlockFile)
+			}
+		case errors.Is(err, os.ErrNotExist):
+			logger.Warn("ad block list file not found, continuing without ad presets", "file", cfg.Rules.AdBlockFile)
+		default:
+			return nil, fmt.Errorf("load ad block domains: %w", err)
+		}
+	}
+
+	engine.ReplaceRules(loadedRules)
 
 	return &App{
 		cfg:    cfg,

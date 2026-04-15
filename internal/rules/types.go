@@ -22,10 +22,11 @@ type Rule struct {
 }
 
 type Matcher struct {
-	HostPattern string      `json:"host_pattern" yaml:"host_pattern"`
-	PathPattern string      `json:"path_pattern" yaml:"path_pattern"`
-	Methods     []string    `json:"methods" yaml:"methods"`
-	TimeWindow  *TimeWindow `json:"time_window" yaml:"time_window"`
+	HostPattern  string      `json:"host_pattern" yaml:"host_pattern"`
+	HostPatterns []string    `json:"host_patterns,omitempty" yaml:"host_patterns,omitempty"`
+	PathPattern  string      `json:"path_pattern" yaml:"path_pattern"`
+	Methods      []string    `json:"methods" yaml:"methods"`
+	TimeWindow   *TimeWindow `json:"time_window" yaml:"time_window"`
 }
 
 type TimeWindow struct {

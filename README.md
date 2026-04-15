@@ -13,6 +13,7 @@ Current implementation includes a working baseline proxy:
 - HTTPS CONNECT tunneling support
 - Rule engine evaluation for request decisions
 - Rule actions: allow, block, redirect (HTTP), and request-header mutation
+- Domain-based ad/tracker blocking from dedicated blocklist file
 - Starter config and rule files
 
 ## Quick Start
@@ -31,7 +32,8 @@ ALLSEER_CONFIG=config/config.json go run ./cmd/allseer
 
 By default, the proxy listens on `127.0.0.1:8080`.
 
-Rules are loaded from `config/rules.example.yaml` by default. Override this through `config/config.json`.
+Rules are loaded from `config/rules.example.yaml` by default, and ad/tracker domains are loaded from `config/ad_domains.txt`.
+Override these through `config/config.json`.
 
 ## Project Layout
 
