@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"log/slog"
+	"net"
 	"net/http"
 	"time"
 )
@@ -15,6 +16,8 @@ type Options struct {
 
 type Server struct {
 	httpServer *http.Server
+	transport  *http.Transport
+	dialer     *net.Dialer
 	logger     *slog.Logger
 }
 
@@ -35,7 +38,23 @@ func NewServer(opts Options, logger *slog.Logger) *Server {
 		opts.IdleTimeout = 60 * time.Second
 	}
 
-	s := &Server{logger: logger}
+	dialer := &net.Dialer{
+		Timeout:   10 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+
+	transport := &http.Transport{
+		Proxy:                 nil,
+		DialContext:           dialer.DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second,
+	}
+
+	s := &Server{logger: logger, transport: transport, dialer: dialer}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handleProxyRequest)
@@ -55,6 +74,10 @@ func (s *Server) ListenAndServe() error {
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
+	if s.transport != nil {
+		s.transport.CloseIdleConnections()
+	}
+
 	return s.httpServer.Shutdown(ctx)
 }
 
