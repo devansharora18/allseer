@@ -40,6 +40,7 @@ func (d Duration) MarshalJSON() ([]byte, error) {
 
 type Config struct {
 	Proxy ProxyConfig `json:"proxy"`
+	Rules RulesConfig `json:"rules"`
 }
 
 type ProxyConfig struct {
@@ -49,6 +50,10 @@ type ProxyConfig struct {
 	ShutdownTimeout   Duration `json:"shutdown_timeout"`
 }
 
+type RulesConfig struct {
+	File string `json:"file"`
+}
+
 func Default() Config {
 	return Config{
 		Proxy: ProxyConfig{
@@ -56,6 +61,9 @@ func Default() Config {
 			ReadHeaderTimeout: Duration(10 * time.Second),
 			IdleTimeout:       Duration(60 * time.Second),
 			ShutdownTimeout:   Duration(10 * time.Second),
+		},
+		Rules: RulesConfig{
+			File: "config/rules.example.yaml",
 		},
 	}
 }

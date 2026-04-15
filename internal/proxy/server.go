@@ -6,18 +6,22 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"allseer/internal/rules"
 )
 
 type Options struct {
 	ListenAddr        string
 	ReadHeaderTimeout time.Duration
 	IdleTimeout       time.Duration
+	RuleEngine        *rules.Engine
 }
 
 type Server struct {
 	httpServer *http.Server
 	transport  *http.Transport
 	dialer     *net.Dialer
+	ruleEngine *rules.Engine
 	logger     *slog.Logger
 }
 
@@ -54,7 +58,12 @@ func NewServer(opts Options, logger *slog.Logger) *Server {
 		ResponseHeaderTimeout: 30 * time.Second,
 	}
 
-	s := &Server{logger: logger, transport: transport, dialer: dialer}
+	ruleEngine := opts.RuleEngine
+	if ruleEngine == nil {
+		ruleEngine = rules.NewEngine(nil)
+	}
+
+	s := &Server{logger: logger, transport: transport, dialer: dialer, ruleEngine: ruleEngine}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handleProxyRequest)

@@ -5,11 +5,26 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
 func (s *Server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
+	decision := s.evaluateRequestDecision(r)
+
+	if shouldBlockDecision(decision) {
+		s.logger.Info("connect request blocked by rule", "rule", decision.Rule.Name, "host", requestHost(r))
+		http.Error(w, "blocked by proxy rule", http.StatusForbidden)
+		return
+	}
+
+	if shouldRedirectHTTP(decision) {
+		target := strings.TrimSpace(decision.Action.Target)
+		s.logger.Warn("redirect action is unsupported for CONNECT", "rule", decision.Rule.Name, "target", target)
+		http.Error(w, "redirect action is unsupported for CONNECT", http.StatusBadRequest)
+		return
+	}
 
 	if r.Host == "" {
 		http.Error(w, "missing CONNECT host", http.StatusBadRequest)

@@ -2,11 +2,15 @@ package app
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"allseer/internal/config"
 	"allseer/internal/proxy"
+	"allseer/internal/rules"
 )
 
 type App struct {
@@ -15,9 +19,23 @@ type App struct {
 	server *proxy.Server
 }
 
-func New(cfg config.Config, logger *slog.Logger) *App {
+func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	if logger == nil {
 		logger = slog.Default()
+	}
+
+	engine := rules.NewEngine(nil)
+	if cfg.Rules.File != "" {
+		loadedRules, err := rules.LoadFromFile(cfg.Rules.File)
+		switch {
+		case err == nil:
+			engine.ReplaceRules(loadedRules)
+			logger.Info("loaded rules", "count", len(loadedRules), "file", cfg.Rules.File)
+		case errors.Is(err, os.ErrNotExist):
+			logger.Warn("rules file not found, continuing without rules", "file", cfg.Rules.File)
+		default:
+			return nil, fmt.Errorf("load rules: %w", err)
+		}
 	}
 
 	return &App{
@@ -27,8 +45,9 @@ func New(cfg config.Config, logger *slog.Logger) *App {
 			ListenAddr:        cfg.Proxy.ListenAddr,
 			ReadHeaderTimeout: cfg.Proxy.ReadHeaderTimeout.Value(),
 			IdleTimeout:       cfg.Proxy.IdleTimeout.Value(),
+			RuleEngine:        engine,
 		}, logger),
-	}
+	}, nil
 }
 
 func (a *App) Run(ctx context.Context) error {

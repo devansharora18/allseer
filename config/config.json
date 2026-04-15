@@ -4,5 +4,8 @@
     "read_header_timeout": "10s",
     "idle_timeout": "60s",
     "shutdown_timeout": "10s"
+  },
+  "rules": {
+    "file": "config/rules.example.yaml"
   }
 }

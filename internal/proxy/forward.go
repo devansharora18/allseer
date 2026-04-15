@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"allseer/internal/rules"
 )
 
 var hopByHopHeaders = []string{
@@ -24,6 +26,26 @@ var hopByHopHeaders = []string{
 
 func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
+	decision := s.evaluateRequestDecision(r)
+
+	if shouldBlockDecision(decision) {
+		s.logger.Info("http request blocked by rule", "rule", decision.Rule.Name, "method", r.Method, "host", requestHost(r))
+		http.Error(w, "blocked by proxy rule", http.StatusForbidden)
+		return
+	}
+
+	if shouldRedirectHTTP(decision) {
+		target := strings.TrimSpace(decision.Action.Target)
+		if target == "" {
+			s.logger.Warn("redirect rule missing target", "rule", decision.Rule.Name)
+			http.Error(w, "rule redirect target is missing", http.StatusInternalServerError)
+			return
+		}
+
+		s.logger.Info("http request redirected by rule", "rule", decision.Rule.Name, "method", r.Method, "from", requestHost(r), "to", target)
+		http.Redirect(w, r, target, http.StatusTemporaryRedirect)
+		return
+	}
 
 	targetURL, err := outboundURL(r)
 	if err != nil {
@@ -39,6 +61,9 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 
 	stripHopByHopHeaders(outReq.Header)
 	appendForwardedFor(outReq.Header, r.RemoteAddr)
+	if decision.Matched && decision.Action.Type == rules.ActionModifyRequest {
+		applyHeaderMutations(outReq.Header, decision.Action.Headers)
+	}
 
 	resp, err := s.transport.RoundTrip(outReq)
 	if err != nil {
@@ -70,6 +95,8 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		"method", r.Method,
 		"target", targetURL.String(),
 		"status", resp.StatusCode,
+		"rule", decision.Rule.Name,
+		"rule_action", decision.Action.Type,
 		"duration_ms", time.Since(start).Milliseconds(),
 	)
 }
@@ -141,5 +168,21 @@ func copyHeaders(dst, src http.Header) {
 		for _, value := range values {
 			dst.Add(key, value)
 		}
+	}
+}
+
+func applyHeaderMutations(headers http.Header, updates map[string]string) {
+	for key, value := range updates {
+		canonical := http.CanonicalHeaderKey(strings.TrimSpace(key))
+		if canonical == "" {
+			continue
+		}
+
+		if value == "" {
+			headers.Del(canonical)
+			continue
+		}
+
+		headers.Set(canonical, value)
 	}
 }
