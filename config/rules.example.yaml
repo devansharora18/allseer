@@ -1,0 +1,27 @@
+rules:
+  - name: block-ads-domains
+    enabled: true
+    priority: 10
+    match:
+      host_pattern: "*ads*"
+    action:
+      type: block
+
+  - name: block-social-focus-mode
+    enabled: true
+    priority: 20
+    match:
+      host_pattern: "*youtube*"
+      time_window:
+        start_hour: 9
+        end_hour: 17
+    action:
+      type: block
+
+  - name: allow-api-traffic
+    enabled: true
+    priority: 100
+    match:
+      host_pattern: "*api*"
+    action:
+      type: allow
