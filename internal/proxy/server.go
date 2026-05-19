@@ -26,6 +26,7 @@ type Server struct {
 	ruleEngine *rules.Engine
 	logRepo    *sqlite.LogRepository
 	logger     *slog.Logger
+	startTime  time.Time
 }
 
 func NewServer(opts Options, logger *slog.Logger) *Server {
@@ -66,9 +67,21 @@ func NewServer(opts Options, logger *slog.Logger) *Server {
 		ruleEngine = rules.NewEngine(nil)
 	}
 
-	s := &Server{logger: logger, transport: transport, dialer: dialer, ruleEngine: ruleEngine, logRepo: opts.LogRepository}
+	s := &Server{
+		logger:     logger,
+		transport: transport,
+		dialer:    dialer,
+		ruleEngine: ruleEngine,
+		logRepo:   opts.LogRepository,
+		startTime: time.Now(),
+	}
 
 	mux := http.NewServeMux()
+	// API endpoints
+	mux.HandleFunc("/api/stats", s.handleStatistics)
+	mux.HandleFunc("/api/rules", s.handleRulesList)
+	mux.HandleFunc("/api/rules/delete", s.handleRuleDetail)
+	// SPA and proxy
 	mux.HandleFunc("/", s.handleProxyRequest)
 
 	s.httpServer = &http.Server{
