@@ -26,3 +26,5 @@ serving-sys.com
 yieldmo.com
 mathtag.com
 adclick.g.doubleclick.net
+youtube.com
+ad.doubleclick.net

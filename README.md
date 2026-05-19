@@ -15,6 +15,7 @@ Current implementation includes a working baseline proxy:
 - Rule actions: allow, block, redirect (HTTP), and request-header mutation
 - Domain-based ad/tracker blocking from dedicated blocklist file
 - Persistent traffic logging to local SQLite database
+- Local admin endpoint for recent traffic logs
 - Starter config and rule files
 
 ## Quick Start
@@ -37,6 +38,17 @@ Rules are loaded from `config/rules.example.yaml` by default, and ad/tracker dom
 Override these through `config/config.json`.
 
 Traffic logs are persisted by default in `allseer.db` (configured via `database.path` in `config/config.json`).
+
+Query recent logs from the local admin endpoint:
+
+```bash
+curl "http://127.0.0.1:8080/admin/logs?limit=100"
+```
+
+Notes:
+- Endpoint is local-control API intended for direct requests to the proxy process.
+- Absolute proxy requests are not treated as admin API calls.
+- `limit` defaults to 100 and is capped at 1000.
 
 ## Project Layout
 

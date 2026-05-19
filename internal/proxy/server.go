@@ -94,6 +94,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 }
 
 func (s *Server) handleProxyRequest(w http.ResponseWriter, r *http.Request) {
+	if isLocalAdminLogsRequest(r) {
+		s.handleAdminLogs(w, r)
+		return
+	}
+
 	if r.Method == http.MethodConnect {
 		s.handleConnect(w, r)
 		return
